@@ -1,2 +1,2 @@
-# SharkWatch
-A passive scanning plugin for Wireshark
+# TS.P.S.
+A passive scanning plugin for TShark
