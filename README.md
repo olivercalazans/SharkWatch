@@ -1,2 +1,2 @@
 # TS.P.S.
-A passive scanning plugin for TShark
+TS.P.S. (TShark Passive Scanner) is plugin for TShark
