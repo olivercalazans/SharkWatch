@@ -3,78 +3,79 @@
 # Repository: https://github.com/olivercalazans/WireSpy
 # Permission is hereby granted, free of charge, to any person obtaining a copy of this software...
 
-
 import pyshark
-import sys, os
-
+import os
+from aux import Setup
 
 class Main:
 
     def __init__(self) -> None:
-        self._data     = dict()
-        self._packet   = None
-        self._new_data = None
+        self._data      = {}
+        self._interface = Setup()._get_interface()
 
 
-    def _continuos_sniff(self) -> None:
-        for packet in pyshark.LiveCapture(interface='enp0s8').sniff_continuously():
-            if 'IP' in packet:
-                self._packet = packet
-                self._process_packet()
+    def _continuous_sniff(self) -> None:
+        try:
+            sniffer = pyshark.LiveCapture(interface=self._interface)
+            for packet in sniffer.sniff_continuously():
+                if 'IP' in packet:
+                    self._process_packet(packet)
+        except KeyboardInterrupt:  print('Process interrupted by user')
+        except EOFError:           print('EOFError encountered. Tshark process ended.')
+        except Exception as error: print(f'Unexpected error: {error}')
+        finally: sniffer.close()
 
 
-    def _process_packet(self) -> None:
-        self._get_data_from_packet()
-        self._update_or_add_data()
+    def _process_packet(self, packet) -> None:
+        ip   = packet.ip.src
+        port = self._get_port(packet)
+        self._update_or_add_data(ip, port)
         self._display()
 
 
-    def _get_data_from_packet(self) -> dict:
-        self._new_data = { 
-            'ip':   self._packet.ip.src,
-            'port': self._get_port()
-            }
+    def _get_port(self, packet) -> str:
+        if 'TCP' in packet:
+            return packet.tcp.srcport
+        if 'UDP' in packet:
+            return packet.udp.srcport
+        return None
 
 
-    def _get_port(self) -> int:
-        if 'TCP' in self._packet:
-            return self._packet.tcp.srcport
-        elif 'UDP' in self._packet:
-            return self._packet.udp.srcport
+    def _update_or_add_data(self, ip:str, port:str) -> None:
+        if ip not in self._data:
+            self._data[ip] = {'pkts': 1, 'ports': {port} if port else set()}
         else:
-            return None
-
-
-    def _update_or_add_data(self) -> None:
-        ip   = self._new_data['ip']
-        port = self._new_data['port']
-        if self._new_data['ip'] in self._data:
-            self._update_data(ip, port)
-        else:
-            self._add_data(ip, port)
-
-
-    def _update_data(self, ip:str, port:str) -> None:
-        if port != None:
             self._data[ip]['pkts'] += 1
-            self._data[ip]['ports'].add(port)
-
-
-    def _add_data(self, ip:str, port:str) -> None:
-        port = port if port != None else ''
-        self._data[ip] = {'pkts': 1, 'ports': {port}}
+            if port:
+                self._data[ip]['ports'].add(port)
 
 
     def _display(self) -> None:
         os.system('clear')
-        for packet in self._data.items():
-            ip       = packet[0]
-            pkts_num = packet[1]['pkts']
-            ports    = ', '.join(packet[1]['ports'])
-            sys.stdout.write(f'{ip:<15} ({pkts_num})>> Ports: {ports}\n')
-            sys.stdout.flush()
+        for ip, details in self._data.items():
+            pkts_num = details['pkts']
+            ports = ', '.join(details['ports'])
+            print(f'{self.pink(ip):<23} ({pkts_num})>> {self.yellow("Ports")}: {ports}')
+
+
+    @staticmethod
+    def pink(message: str) -> str:
+        return '\033[35m' + message + '\033[0m'
+
+    @staticmethod
+    def green(message:str) -> str:
+        return '\033[32m' + message + '\033[0m'
+
+    @staticmethod
+    def red(message:str) -> str:
+        return '\033[31m' + message + '\033[0m'
+
+    @staticmethod
+    def yellow(message:str) -> str:
+        return '\033[33m' + message + '\033[0m'
+
+
 
 
 if __name__ == '__main__':
-    scan = Main()
-    scan._continuos_sniff()
+    Main()._continuous_sniff()
