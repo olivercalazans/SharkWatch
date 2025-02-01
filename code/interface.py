@@ -7,7 +7,7 @@
 import subprocess
 
 
-class Setup:
+class Interface:
 
     def __init__(self):
         self._interfaces = None
@@ -46,7 +46,6 @@ class Setup:
     def _validate_input(index):
         try:    return int(index)
         except: return None 
-
 
 
     def _get_network_interfaces(self) -> None:
