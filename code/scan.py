@@ -10,7 +10,9 @@ from interface import Interface
 class Main:
 
     def __init__(self) -> None:
-        self._interface = Interface()._get_interface()
+        self._interface = None
+        self._gateway   = None
+        self._sniffer   = None
         self._data      = dict()
         self._packet    = None
         self._ip        = None
@@ -18,16 +20,31 @@ class Main:
         self._port      = None
 
 
-    def _continuous_sniff(self) -> None:
+    def _execute(self) -> None:
         try:
-            sniffer = pyshark.LiveCapture(interface=self._interface)
-            for packet in sniffer.sniff_continuously():
-                self._packet = packet
-                self._process_packet()
+            self._get_interface_information()
+            self._iniciate_sniffer()
+            self._continuous_sniff()
         except KeyboardInterrupt:  print('Process interrupted by user')
         except EOFError:           print('EOFError encountered. Tshark process ended.')
         except Exception as error: print(f'Unexpected error: {error}')
-        finally: sniffer.close()
+        finally: self._sniffer.close()
+
+
+    def _get_interface_information(self) -> None:
+        interface       = Interface()
+        self._interface = interface._get_interface()
+        self._gateway   = interface._get_gateway_mac()
+
+
+    def _iniciate_sniffer(self) -> None:
+        self._sniffer = pyshark.LiveCapture(interface=self._interface)
+
+
+    def _continuous_sniff(self) -> None:
+        for packet in self._sniffer.sniff_continuously():
+            self._packet = packet
+            self._process_packet()
 
 
     def _process_packet(self) -> None:
@@ -35,7 +52,7 @@ class Main:
         self._get_mac()
         self._get_port()
         self._update_or_add_data()
-        self._display()
+        self._prepare_data_to_display()
 
 
     def _get_ip(self) -> None:
@@ -43,7 +60,10 @@ class Main:
 
 
     def _get_mac(self) -> None:
-        self._mac = self.green(self._packet.eth.src) if 'eth' in self._packet else '-'
+        mac = self._packet.eth.src
+        match mac:
+            case self._gateway: self._mac = self.yellow(mac) + '(internet)'
+            case _:             self._mac = self.red(mac) + '(data link)'
 
 
     def _get_port(self) -> None:
@@ -72,14 +92,11 @@ class Main:
         if self._port: self._data[self._ip]['ports'].add(self._port)
 
 
-    def _display(self) -> None:
+    def _prepare_data_to_display(self) -> None:
         os.system('clear')
-        for ip, details in self._data.items():
-            mac      = details['mac'] 
-            pkts_num = details['pkts']
-            ports    = ', '.join(details['ports'])
-            print(f'{ip:<23}, {mac} ({pkts_num})')
-            print(f'    - {self.yellow("Ports")}: {ports}')
+        for ip, info in self._data.items():
+            print(f'{ip:<23}, {info["mac"]} ({info["pkts"]})')
+            print(f'    - {self.yellow("Ports")}: {", ".join(info["ports"])}')
 
 
     @staticmethod
@@ -102,4 +119,4 @@ class Main:
 
 
 if __name__ == '__main__':
-    Main()._continuous_sniff()
+    Main()._execute()
