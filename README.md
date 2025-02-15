@@ -1,5 +1,9 @@
 # WireSpy
 WireSpy is a command-line tool designed to analyze network traffic and perform network scans and mappings using packets captured by TShark.
+It performs:
+- [x] Port scan
+- [ ] Network mapping (will be added)
+- [ ] OS fingerprint (will be added)
 
 <br>
 
